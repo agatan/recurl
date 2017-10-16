@@ -1,12 +1,13 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"sync"
 
-	"github.com/k0kubun/pp"
 	"github.com/pkg/errors"
 )
 
@@ -52,22 +53,27 @@ func (rec *Recorder) registerSession(cookie string) SessionID {
 }
 
 func (rec *Recorder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	pp.Println(rec.target)
-	reverseProxy := httputil.NewSingleHostReverseProxy(rec.target)
-	// var response *Response
-	// reverseProxy.ModifyResponse = func(resp *http.Response) error {
-	// 	var err error
-	// 	response, err = NewResponse(resp)
-	// 	fmt.Println(response)
-	// 	return err
-	// }
-	// request, err := NewRequest(r)
-	// if err != nil {
-	// 	fmt.Fprintln(os.Stderr, err)
-	// }
+	u := rec.target
+	reverseProxy := &httputil.ReverseProxy{
+		Director: func(r *http.Request) {
+			r.URL.Scheme = u.Scheme
+			r.URL.Host = u.Host
+			r.URL.Path = u.Path + r.URL.Path
+			r.Host = u.Host
+		},
+	}
+	var response *Response
+	reverseProxy.ModifyResponse = func(resp *http.Response) error {
+		var err error
+		response, err = NewResponse(resp)
+		return err
+	}
+	request, err := NewRequest(r)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
 	reverseProxy.ServeHTTP(w, r)
-	// if err := rec.AddExchange(request, response); err != nil {
-	// 	fmt.Fprintln(os.Stderr, err)
-	// }
-	// fmt.Println("HELLO")
+	if err := rec.AddExchange(request, response); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+	}
 }

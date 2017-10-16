@@ -1,12 +1,13 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
+	"os/signal"
 )
 
 type options struct {
@@ -32,19 +33,19 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	// rec := NewRecorder(upstreamURL)
-	rec := httputil.NewSingleHostReverseProxy(upstreamURL)
-	// go func() {
-	if err := http.ListenAndServe(op.address, rec); err != nil {
+	rec := NewRecorder(upstreamURL)
+
+	go func() {
+		if err := http.ListenAndServe(op.address, rec); err != nil {
+			panic(err)
+		}
+	}()
+
+	ch := make(chan os.Signal)
+	signal.Notify(ch, os.Interrupt)
+	<-ch
+
+	if err := json.NewEncoder(os.Stdout).Encode(rec.Exchanges); err != nil {
 		panic(err)
 	}
-	// }()
-	//
-	// ch := make(chan os.Signal)
-	// signal.Notify(ch, os.Interrupt)
-	// <-ch
-	//
-	// if err := json.NewEncoder(os.Stdout).Encode(rec.Exchanges); err != nil {
-	// 	panic(err)
-	// }
 }
