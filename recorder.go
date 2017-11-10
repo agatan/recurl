@@ -45,6 +45,7 @@ func (rec *Recorder) AddExchange(req *Request, resp *Response) error {
 			c.ID = *ex.SessionID
 		}
 		rec.registerCookie(c)
+		ex.SessionID = &c.ID
 	}
 	rec.Exchanges = append(rec.Exchanges, ex)
 	return nil
