@@ -38,19 +38,25 @@ func (rec *Recorder) AddExchange(req *Request, resp *Response) error {
 		ex.SessionID = &matched.ID
 	}
 	if cookie := resp.Header.Get("Set-Cookie"); cookie != "" {
-		sess := rec.registerSession(cookie)
-		ex.SessionID = &sess
+		c := NewCookie(cookie)
+		if ex.SessionID == nil {
+			c.ID = rec.newSessionID()
+		} else {
+			c.ID = *ex.SessionID
+		}
+		rec.registerCookie(c)
 	}
 	rec.Exchanges = append(rec.Exchanges, ex)
 	return nil
 }
 
-func (rec *Recorder) registerSession(cookie string) SessionID {
+func (rec *Recorder) newSessionID() SessionID {
 	rec.lastSessionID++
-	c := NewCookie(cookie)
-	c.ID = rec.lastSessionID
-	rec.Sessions.Append(c)
 	return rec.lastSessionID
+}
+
+func (rec *Recorder) registerCookie(cookie *Cookie) {
+	rec.Sessions.Append(cookie)
 }
 
 func (rec *Recorder) ServeHTTP(w http.ResponseWriter, r *http.Request) {
