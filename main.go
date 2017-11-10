@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,6 +14,7 @@ import (
 type options struct {
 	address  string
 	upstream string
+	output   string
 }
 
 func main() {
@@ -20,6 +22,7 @@ func main() {
 
 	flag.StringVar(&op.address, "addr", ":8080", "listening address")
 	flag.StringVar(&op.upstream, "upstream", "", "upstream server address [required]")
+	flag.StringVar(&op.output, "o", "", "output file (default: stdout)")
 
 	flag.Parse()
 
@@ -27,6 +30,18 @@ func main() {
 		fmt.Fprintln(os.Stderr, "upstream is not given\nUsage:")
 		flag.PrintDefaults()
 		os.Exit(1)
+	}
+
+	var w io.Writer
+	if op.output == "" || op.output == "stdout" {
+		w = os.Stdout
+	} else {
+		f, err := os.OpenFile(op.output, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		if err != nil {
+			panic(err)
+		}
+		w = f
+		defer f.Close()
 	}
 
 	upstreamURL, err := url.Parse(op.upstream)
@@ -45,7 +60,7 @@ func main() {
 	signal.Notify(ch, os.Interrupt)
 	<-ch
 
-	if err := json.NewEncoder(os.Stdout).Encode(rec.Exchanges); err != nil {
+	if err := json.NewEncoder(w).Encode(rec.Exchanges); err != nil {
 		panic(err)
 	}
 }
