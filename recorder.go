@@ -13,7 +13,7 @@ import (
 
 type Recorder struct {
 	Exchanges     []*Exchange
-	Sessions      map[string]SessionID
+	Sessions      Cookies
 	lastSessionID SessionID
 	target        *url.URL
 	mu            sync.Mutex
@@ -21,8 +21,7 @@ type Recorder struct {
 
 func NewRecorder(target *url.URL) *Recorder {
 	return &Recorder{
-		Sessions: make(map[string]SessionID),
-		target:   target,
+		target: target,
 	}
 }
 
@@ -32,11 +31,11 @@ func (rec *Recorder) AddExchange(req *Request, resp *Response) error {
 	ex := &Exchange{Request: req, Response: resp}
 	if cookie := req.Header.Get("Cookie"); cookie != "" {
 		// cookie exists.
-		sess, ok := rec.Sessions[cookie]
+		matched, ok := rec.Sessions.FindMatch(NewCookie(cookie))
 		if !ok {
 			return errors.Errorf("unknown cookie: %v", cookie)
 		}
-		ex.SessionID = &sess
+		ex.SessionID = &matched.ID
 	}
 	if cookie := resp.Header.Get("Set-Cookie"); cookie != "" {
 		sess := rec.registerSession(cookie)
@@ -48,7 +47,9 @@ func (rec *Recorder) AddExchange(req *Request, resp *Response) error {
 
 func (rec *Recorder) registerSession(cookie string) SessionID {
 	rec.lastSessionID++
-	rec.Sessions[cookie] = rec.lastSessionID
+	c := NewCookie(cookie)
+	c.ID = rec.lastSessionID
+	rec.Sessions.Append(c)
 	return rec.lastSessionID
 }
 
