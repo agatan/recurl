@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"unicode/utf8"
 )
 
 type SessionID int
@@ -16,12 +17,13 @@ type Exchange struct {
 }
 
 type Request struct {
-	Method string
-	URL    *url.URL
-	Proto  string // "HTTP/1.0"
-	Header http.Header
-	Body   []byte
-	Host   string
+	Method     string
+	URL        *url.URL
+	Proto      string // "HTTP/1.0"
+	Header     http.Header
+	Body       []byte `json:"Body,omitempty"`
+	BodyString string `json:"BodyString,omitempty"`
+	Host       string
 }
 
 // NewRequest returns Request object from http.Request.
@@ -33,21 +35,27 @@ func NewRequest(r *http.Request) (*Request, error) {
 	}
 	u := *r.URL
 	r.Body = ioutil.NopCloser(bytes.NewReader(body))
-	return &Request{
+	req := &Request{
 		Method: r.Method,
 		URL:    &u,
 		Proto:  r.Proto,
 		Header: r.Header,
-		Body:   body,
 		Host:   r.Host,
-	}, nil
+	}
+	if utf8.Valid(body) {
+		req.BodyString = string(body)
+	} else {
+		req.Body = body
+	}
+	return req, nil
 }
 
 type Response struct {
 	StatusCode int    // e.g. "200 OK"
 	Proto      string // e.g. "HTTP/1.0"
 	Header     http.Header
-	Body       []byte
+	Body       []byte `json:"Body,omitempty"`
+	BodyString string `json:"BodyString,omitempty"`
 }
 
 // NewResponse returns Response object from http.Response.
@@ -58,10 +66,15 @@ func NewResponse(r *http.Response) (*Response, error) {
 		return nil, err
 	}
 	r.Body = ioutil.NopCloser(bytes.NewReader(body))
-	return &Response{
+	resp := &Response{
 		StatusCode: r.StatusCode,
 		Proto:      r.Proto,
 		Header:     r.Header,
-		Body:       body,
-	}, nil
+	}
+	if utf8.Valid(body) {
+		resp.BodyString = string(body)
+	} else {
+		resp.Body = body
+	}
+	return resp, nil
 }
